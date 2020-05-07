@@ -1,4 +1,5 @@
-import { getRepository } from 'typeorm';
+import { getCustomRepository } from 'typeorm';
+
 import AppError from '../errors/AppError';
 
 import Transaction from '../models/Transaction';
@@ -14,47 +15,36 @@ interface Request {
 }
 
 class CreateTransactionService {
-  private createCategoryService: CreateCategoryService;
-
-  private transactionsRepository: TransactionsRepository;
-
-  constructor(
-    transactionsRepository: TransactionsRepository,
-    createCategoryService: CreateCategoryService,
-  ) {
-    this.transactionsRepository = transactionsRepository;
-    this.createCategoryService = createCategoryService;
-  }
-
   public async execute({
     title,
     value,
     type,
     categoryTitle,
   }: Request): Promise<Transaction> {
-    const category = await this.createCategoryService.execute({
+    const createCategory = new CreateCategoryService();
+    const transactionsRepository = getCustomRepository(TransactionsRepository);
+
+    const category = await createCategory.execute({
       title: categoryTitle,
     });
 
-    const tran = getRepository(Transaction);
+    if (type === 'outcome') {
+      const balance = await transactionsRepository.getBalance();
+      if (value > balance.total) {
+        throw new AppError(
+          'Value form transaction type outcome cannot be greater than total balance.',
+        );
+      }
+    }
 
-    // if (type === 'outcome') {
-    //   const balance = await this.transactionsRepository.getBalance();
-    //   if (value > balance.total) {
-    //     throw new AppError(
-    //       'Value form transaction type outcome cannot be greater than total balance.',
-    //     );
-    //   }
-    // }
-
-    const transaction = tran.create({
+    const transaction = transactionsRepository.create({
       title,
       value,
       type,
       category_id: category.id,
     });
 
-    await tran.save(transaction);
+    await transactionsRepository.save(transaction);
 
     return transaction;
   }
