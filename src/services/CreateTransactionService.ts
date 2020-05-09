@@ -15,22 +15,27 @@ interface Request {
 }
 
 class CreateTransactionService {
+  private createCategory: CreateCategoryService;
+
+  constructor(createCategory: CreateCategoryService) {
+    this.createCategory = createCategory;
+  }
+
   public async execute({
     title,
     value,
     type,
     categoryTitle,
   }: Request): Promise<Transaction> {
-    const createCategory = new CreateCategoryService();
     const transactionsRepository = getCustomRepository(TransactionsRepository);
 
-    const category = await createCategory.execute({
+    const category = await this.createCategory.execute({
       title: categoryTitle,
     });
 
     if (type === 'outcome') {
-      const balance = await transactionsRepository.getBalance();
-      if (value > balance.total) {
+      const { total } = await transactionsRepository.getBalance();
+      if (value > total) {
         throw new AppError(
           'Value form transaction type outcome cannot be greater than total balance.',
         );
@@ -41,7 +46,7 @@ class CreateTransactionService {
       title,
       value,
       type,
-      category_id: category.id,
+      category,
     });
 
     await transactionsRepository.save(transaction);
